@@ -13,7 +13,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Set up Go
-        uses: actions/setup-go@v1
+        uses: actions/setup-go@v2
         with:
           go-version: ${{ matrix.go }}
 
@@ -25,7 +25,7 @@ jobs:
         shell: bash
 
       - name: Test
-        run: go test -race
+        run: go test -short -race
 
       - name: Bench
         run: go test -run=Benchmark -bench=.
