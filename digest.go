@@ -96,8 +96,8 @@ func NewDigest(min float64, max float64, err float64) *Digest {
 		params: p,
 		min:    math.Inf(1),
 		max:    math.Inf(-1),
-		neg:    make([]uint64, -p.bucketKey(p.minVal)+1),
-		pos:    make([]uint64, p.bucketKey(p.maxVal)+1),
+		neg:    make([]uint64, 1-p.bucketKey(p.minVal)),
+		pos:    make([]uint64, p.bucketKey(p.maxVal)),
 	}
 }
 
@@ -170,7 +170,7 @@ func (d *Digest) Add(v float64) {
 
 	k := d.bucketKey(v)
 	if k >= 1 {
-		d.pos[k]++
+		d.pos[k-1]++
 		d.numPos++
 	} else {
 		d.neg[-k]++
@@ -205,7 +205,7 @@ func (d *Digest) Quantile(q float64) float64 {
 		return d.quantile(-i)
 	} else {
 		i := rankIndex(rank-d.numNeg, d.pos)
-		return d.quantile(i)
+		return d.quantile(i + 1)
 	}
 }
 
