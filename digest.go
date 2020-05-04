@@ -21,7 +21,7 @@ import (
 	"math"
 )
 
-// TODO: track max non-empty indices for faster quantiles and merging
+// TODO: track max non-empty indices for faster quantiles and merging?
 // TODO: expose size information (number of buckets)
 
 // Digest tracks distribution of values using histograms
@@ -124,13 +124,13 @@ func (d *Digest) Merge(v *Digest) error {
 		return fmt.Errorf("can not merge b-digest with params %+v into one with %+v", v.params, d.params)
 	}
 
-	d.addKahan(v.sum)
 	if v.min < d.min {
 		d.min = v.min
 	}
 	if v.max > d.max {
 		d.max = v.max
 	}
+	d.addKahan(v.sum)
 
 	for i, n := range v.buckets {
 		d.buckets[i] += n
