@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package bdigest provides tools for fast and memory-efficient estimation
+// of quantiles with guaranteed relative error and full mergeability.
 package bdigest
 
 import (
