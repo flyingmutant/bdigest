@@ -275,7 +275,7 @@ func (m *digestMachine) AddDigest(t *rapid.T) {
 
 func (m *digestMachine) MergeDigests(t *rapid.T) {
 	if len(m.digests) < 1 {
-		return
+		t.SkipNow()
 	}
 
 	to := rapid.SampledFrom(m.digests).Draw(t, "digest to").(digestPair)
