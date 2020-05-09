@@ -1,4 +1,4 @@
-# b-digest [![GoDoc][godoc-img]][godoc] ![CI][ci-img]
+# b-digest [![GoDoc][godoc-img]][godoc] [![CI][ci-img]][ci]
 
 b-digest is a library for fast and memory-efficient estimation
 of quantiles with guaranteed relative error and full mergeability.
@@ -44,3 +44,4 @@ func ExampleNewDefaultDigest() {
 [godoc-img]: https://godoc.org/pgregory.net/bdigest?status.svg
 [godoc]: https://godoc.org/pgregory.net/bdigest
 [ci-img]: https://github.com/flyingmutant/bdigest/workflows/CI/badge.svg
+[ci]: https://github.com/flyingmutant/bdigest/actions
