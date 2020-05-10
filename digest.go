@@ -19,6 +19,7 @@ package bdigest
 import (
 	"fmt"
 	"math"
+	"sort"
 )
 
 // TODO: track max non-empty indices for faster quantiles and merging?
@@ -36,8 +37,7 @@ type Digest struct {
 
 	buckets []uint64
 	offset  int
-	numNeg  uint64
-	numPos  uint64
+	count   uint64
 }
 
 type params struct {
@@ -112,7 +112,7 @@ func (d *Digest) Sum() float64 {
 
 // Count returns the number of added values.
 func (d *Digest) Count() uint64 {
-	return d.numPos + d.numNeg
+	return d.count
 }
 
 // Merge merges the content of v into the digest.
@@ -135,18 +135,17 @@ func (d *Digest) Merge(v *Digest) error {
 	for i, n := range v.buckets {
 		d.buckets[i] += n
 	}
-	d.numNeg += v.numNeg
-	d.numPos += v.numPos
+	d.count += v.count
 
 	return nil
 }
 
-// Add adds non-negative value v to the digest.
+// AddX adds non-negative value v to the digest.
 // If v is outside of the digest range, v is set to the
 // minimum/maximum value of the range.
 //
-// Add panics if v is negative or NaN.
-func (d *Digest) Add(v float64) {
+// AddX panics if v is negative or NaN.
+func AddX(d *Digest, v float64) {
 	if math.IsNaN(v) || v < 0 {
 		panic("v must be non-negative")
 	}
@@ -166,12 +165,12 @@ func (d *Digest) Add(v float64) {
 	d.addKahan(v)
 
 	k := d.bucketKey(v)
-	d.buckets[k+d.offset-1]++
-	if k >= 1 {
-		d.numPos++
-	} else {
-		d.numNeg++
+	n := len(d.buckets)
+	for i := k + d.offset - 1; i < n; i++ {
+		d.buckets[i]++
 	}
+	//d.buckets[k+d.offset-1]++
+	d.count++
 }
 
 // Quantile returns the q-quantile of added values.
@@ -185,7 +184,7 @@ func (d *Digest) Quantile(q float64) float64 {
 		panic("q must be in [0, 1]")
 	}
 
-	if d.Count() == 0 {
+	if d.count == 0 {
 		return math.NaN()
 	}
 
@@ -195,14 +194,9 @@ func (d *Digest) Quantile(q float64) float64 {
 		return d.max
 	}
 
-	rank := uint64(1 + q*float64(d.Count()-1))
-	if rank <= d.numNeg {
-		i := rankIndex(rank, d.buckets)
-		return d.quantile(i - d.offset + 1)
-	} else {
-		i := rankIndex(rank-d.numNeg, d.buckets[d.offset:])
-		return d.quantile(i + 1)
-	}
+	rank := uint64(1 + q*float64(d.count-1))
+	i := rankIndex(rank, d.buckets)
+	return d.quantile(i - d.offset + 1)
 }
 
 func (d *Digest) addKahan(v float64) {
@@ -213,12 +207,29 @@ func (d *Digest) addKahan(v float64) {
 }
 
 func rankIndex(rank uint64, buckets []uint64) int {
-	n := uint64(0)
-	for i, b := range buckets {
-		n += b
-		if n >= rank {
-			return i
+	// Define f(-1) == false and f(n) == true.
+	// Invariant: f(i-1) == false, f(j) == true.
+	i, j := 0, len(buckets)
+	for i < j {
+		h := int(uint(i+j) >> 1) // avoid overflow when computing h
+		// i ≤ h < j
+		if buckets[h] < rank {
+			i = h + 1 // preserves f(i-1) == false
+		} else {
+			j = h // preserves f(j) == true
 		}
 	}
-	return len(buckets) - 1
+	// i == j, f(i-1) == false, and f(j) (= f(i)) == true  =>  answer is i.
+	return i
+	return sort.Search(len(buckets), func(i int) bool {
+		return buckets[i] >= rank
+	})
+	//n := uint64(0)
+	//for i, b := range buckets {
+	//	n += b
+	//	if n >= rank {
+	//		return i
+	//	}
+	//}
+	//return len(buckets) - 1
 }

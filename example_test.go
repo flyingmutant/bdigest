@@ -28,7 +28,7 @@ func ExampleNewDefaultDigest() {
 
 	for i := 0; i < 100000; i++ {
 		v := math.Exp(r.NormFloat64())
-		d.Add(v)
+		bdigest.AddX(d, v)
 	}
 
 	for _, q := range []float64{0, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99, 0.999, 0.9999, 1} {
