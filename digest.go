@@ -140,12 +140,45 @@ func (d *Digest) Merge(v *Digest) error {
 	return nil
 }
 
-// AddX adds non-negative value v to the digest.
+// AddXFast adds non-negative value v to the digest.
 // If v is outside of the digest range, v is set to the
 // minimum/maximum value of the range.
 //
-// AddX panics if v is negative or NaN.
-func AddX(d *Digest, v float64) {
+// AddXFast panics if v is negative or NaN.
+func AddXFast(d *Digest, v float64) {
+	if math.IsNaN(v) || v < 0 {
+		panic("v must be non-negative")
+	}
+
+	if v < d.minVal {
+		v = d.minVal
+	} else if v > d.maxVal {
+		v = d.maxVal
+	}
+
+	if v < d.min {
+		d.min = v
+	}
+	if v > d.max {
+		d.max = v
+	}
+	d.addKahan(v)
+
+	k := d.bucketKey(v)
+	//n := len(d.buckets)
+	for i := k + d.offset - 1; i < len(d.buckets); i++ {
+		d.buckets[i]++
+	}
+	//d.buckets[k+d.offset-1]++
+	d.count++
+}
+
+// AddXFast adds non-negative value v to the digest.
+// If v is outside of the digest range, v is set to the
+// minimum/maximum value of the range.
+//
+// AddXFast panics if v is negative or NaN.
+func AddXSlow(d *Digest, v float64) {
 	if math.IsNaN(v) || v < 0 {
 		panic("v must be non-negative")
 	}

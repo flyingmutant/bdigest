@@ -24,7 +24,7 @@ import (
 )
 
 var (
-	errors    = []float64{0.001}
+	errors    = []float64{0.001, 0.01, 0.05}
 	quantiles = []float64{0, 0.001, 0.01, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99, 0.999, 0.9999, 1}
 )
 
@@ -38,7 +38,7 @@ func BenchmarkNewDefaultDigest(b *testing.B) {
 	}
 }
 
-func BenchmarkDigest_Add(b *testing.B) {
+func BenchmarkDigest_AddFast(b *testing.B) {
 	for _, err := range errors {
 		b.Run(fmt.Sprintf("%v", err), func(b *testing.B) {
 			r := rand.New(rand.NewSource(0))
@@ -50,7 +50,25 @@ func BenchmarkDigest_Add(b *testing.B) {
 			b.ResetTimer()
 
 			for i := 0; i < b.N; i++ {
-				bdigest.AddX(d, values[i])
+				bdigest.AddXFast(d, values[i])
+			}
+		})
+	}
+}
+
+func BenchmarkDigest_AddSlow(b *testing.B) {
+	for _, err := range errors {
+		b.Run(fmt.Sprintf("%v", err), func(b *testing.B) {
+			r := rand.New(rand.NewSource(0))
+			values := make([]float64, b.N)
+			for i := 0; i < b.N; i++ {
+				values[i] = math.Exp(r.NormFloat64())
+			}
+			d := bdigest.NewDefaultDigest(err)
+			b.ResetTimer()
+
+			for i := 0; i < b.N; i++ {
+				bdigest.AddXSlow(d, values[i])
 			}
 		})
 	}
@@ -62,7 +80,7 @@ func BenchmarkDigest_Quantile(b *testing.B) {
 			r := rand.New(rand.NewSource(0))
 			d := bdigest.NewDefaultDigest(err)
 			for i := 0; i < 100000; i++ {
-				bdigest.AddX(d, math.Exp(r.NormFloat64()))
+				bdigest.AddXFast(d, math.Exp(r.NormFloat64()))
 			}
 
 			for _, q := range quantiles {
@@ -83,8 +101,8 @@ func BenchmarkDigest_Merge(b *testing.B) {
 			d1 := bdigest.NewDefaultDigest(err)
 			d2 := bdigest.NewDefaultDigest(err)
 			for i := 0; i < 100000; i++ {
-				bdigest.AddX(d1, math.Exp(r.NormFloat64()))
-				bdigest.AddX(d2, math.Exp(r.NormFloat64()))
+				bdigest.AddXFast(d1, math.Exp(r.NormFloat64()))
+				bdigest.AddXFast(d2, math.Exp(r.NormFloat64()))
 			}
 			b.ResetTimer()
 

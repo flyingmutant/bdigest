@@ -125,7 +125,7 @@ type approxDigest struct {
 }
 
 func (d *approxDigest) Add(x float64) {
-	bdigest.AddX(d.Digest, x)
+	bdigest.AddXFast(d.Digest, x)
 }
 
 func (d *approxDigest) Merge(v digest) {
@@ -267,7 +267,7 @@ func (m *digestMachine) AddDigest(t *rapid.T) {
 	for i := 0; i < size; i++ {
 		f := math.Abs(g.Gen())
 		t.Logf("adding %v", f)
-		bdigest.AddX(d.Digest, f)
+		bdigest.AddXFast(d.Digest, f)
 		r.Add(f)
 	}
 
