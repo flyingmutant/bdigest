@@ -112,7 +112,7 @@ func (d *Digest) Sum() float64 {
 
 // Count returns the number of added values.
 func (d *Digest) Count() uint64 {
-	return d.numPos + d.numNeg
+	return d.numNeg + d.numPos
 }
 
 // Merge merges the content of v into the digest.
@@ -169,12 +169,12 @@ func (d *Digest) Add(v float64) {
 	d.addKahan(v)
 
 	k := d.bucketKey(v)
-	if k >= 1 {
-		d.pos[k-1]++
-		d.numPos++
-	} else {
+	if k < 1 {
 		d.neg[-k]++
 		d.numNeg++
+	} else {
+		d.pos[k-1]++
+		d.numPos++
 	}
 }
 
