@@ -173,7 +173,7 @@ func (d *Digest) Add(v float64) {
 		d.pos[k-1]++
 		d.numPos++
 	} else {
-		d.neg[k+len(d.neg)-1]++
+		d.neg[-k]++
 		d.numNeg++
 	}
 }
@@ -201,8 +201,8 @@ func (d *Digest) Quantile(q float64) float64 {
 
 	rank := uint64(1 + q*float64(d.Count()-1))
 	if rank <= d.numNeg {
-		i := rankIndex(rank, d.neg)
-		return d.quantile(i - len(d.neg) + 1)
+		i := rankIndexRev(rank, d.neg)
+		return d.quantile(-i)
 	} else {
 		i := rankIndex(rank-d.numNeg, d.pos)
 		return d.quantile(i + 1)
@@ -214,6 +214,17 @@ func (d *Digest) addKahan(v float64) {
 	t := d.sum + y
 	d.c = (t - d.sum) - y
 	d.sum = t
+}
+
+func rankIndexRev(rank uint64, buckets []uint64) int {
+	n := uint64(0)
+	for i := len(buckets) - 1; i >= 0; i-- {
+		n += buckets[i]
+		if n >= rank {
+			return i
+		}
+	}
+	return 0
 }
 
 func rankIndex(rank uint64, buckets []uint64) int {
