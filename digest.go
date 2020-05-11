@@ -34,10 +34,10 @@ type Digest struct {
 	sum float64
 	c   float64
 
-	buckets []uint64
-	offset  int
-	numNeg  uint64
-	numPos  uint64
+	neg    []uint64
+	pos    []uint64
+	numNeg uint64
+	numPos uint64
 }
 
 type params struct {
@@ -93,11 +93,11 @@ func NewDigest(min float64, max float64, err float64) *Digest {
 	}
 
 	return &Digest{
-		params:  p,
-		min:     math.Inf(1),
-		max:     math.Inf(-1),
-		buckets: make([]uint64, 1-p.bucketKey(p.minVal)+p.bucketKey(p.maxVal)),
-		offset:  1 - p.bucketKey(p.minVal),
+		params: p,
+		min:    math.Inf(1),
+		max:    math.Inf(-1),
+		neg:    make([]uint64, 1-p.bucketKey(p.minVal)),
+		pos:    make([]uint64, p.bucketKey(p.maxVal)),
 	}
 }
 
@@ -132,8 +132,11 @@ func (d *Digest) Merge(v *Digest) error {
 	}
 	d.addKahan(v.sum)
 
-	for i, n := range v.buckets {
-		d.buckets[i] += n
+	for i, n := range v.neg {
+		d.neg[i] += n
+	}
+	for i, n := range v.pos {
+		d.pos[i] += n
 	}
 	d.numNeg += v.numNeg
 	d.numPos += v.numPos
@@ -166,10 +169,11 @@ func (d *Digest) Add(v float64) {
 	d.addKahan(v)
 
 	k := d.bucketKey(v)
-	d.buckets[k+d.offset-1]++
 	if k >= 1 {
+		d.pos[k-1]++
 		d.numPos++
 	} else {
+		d.neg[k+len(d.neg)-1]++
 		d.numNeg++
 	}
 }
@@ -197,10 +201,10 @@ func (d *Digest) Quantile(q float64) float64 {
 
 	rank := uint64(1 + q*float64(d.Count()-1))
 	if rank <= d.numNeg {
-		i := rankIndex(rank, d.buckets)
-		return d.quantile(i - d.offset + 1)
+		i := rankIndex(rank, d.neg)
+		return d.quantile(i - len(d.neg) + 1)
 	} else {
-		i := rankIndex(rank-d.numNeg, d.buckets[d.offset:])
+		i := rankIndex(rank-d.numNeg, d.pos)
 		return d.quantile(i + 1)
 	}
 }
