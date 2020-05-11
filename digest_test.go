@@ -252,15 +252,15 @@ func (m *digestMachine) AddDigest(t *rapid.T) {
 
 	gen := rapid.SampledFrom(generatorNames).Draw(t, "generator").(string)
 	seed := rapid.Int64().Draw(t, "seed").(int64)
-	size := rapid.IntRange(0, maxSize).Draw(t, "size").(int)
+	count := rapid.IntRange(0, maxSize).Draw(t, "count").(int)
 
 	d := &approxDigest{bdigest.NewDigest(m.min, m.max, m.err)}
-	r := &perfectDigest{min: m.min, max: m.max, values: make([]float64, 0, size)}
-	t.Logf("using %v/%v for %v:", gen, size, d.Digest)
+	r := &perfectDigest{min: m.min, max: m.max, values: make([]float64, 0, count)}
+	t.Logf("using %v/%v for %v:", gen, count, d.Digest)
 
 	g := generators[gen](t, m.min, m.max)
 	g.Seed(seed)
-	for i := 0; i < size; i++ {
+	for i := 0; i < count; i++ {
 		f := math.Abs(g.Gen())
 		t.Logf("adding %v", f)
 		d.Add(f)
