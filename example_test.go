@@ -22,9 +22,9 @@ import (
 	"pgregory.net/bdigest"
 )
 
-func ExampleNewDefaultDigest() {
+func ExampleNewDigest() {
 	r := rand.New(rand.NewSource(0))
-	d := bdigest.NewDefaultDigest(0.01)
+	d := bdigest.NewDigest(0.01)
 
 	for i := 0; i < 100000; i++ {
 		v := math.Exp(r.NormFloat64())

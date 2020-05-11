@@ -28,11 +28,11 @@ var (
 	quantiles = []float64{0, 0.001, 0.01, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99, 0.999, 0.9999, 1}
 )
 
-func BenchmarkNewDefaultDigest(b *testing.B) {
+func BenchmarkNewDigest(b *testing.B) {
 	for _, err := range errors {
 		b.Run(fmt.Sprintf("%v", err), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				bdigest.NewDefaultDigest(err)
+				bdigest.NewDigest(err)
 			}
 		})
 	}
@@ -46,7 +46,7 @@ func BenchmarkDigest_Add(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				values[i] = math.Exp(r.NormFloat64())
 			}
-			d := bdigest.NewDefaultDigest(err)
+			d := bdigest.NewDigest(err)
 			b.ResetTimer()
 
 			for i := 0; i < b.N; i++ {
@@ -87,7 +87,7 @@ func BenchmarkDigest_Merge(b *testing.B) {
 }
 
 func logNormalDigest(err float64, seed int64, count int) *bdigest.Digest {
-	d := bdigest.NewDefaultDigest(err)
+	d := bdigest.NewDigest(err)
 
 	r := rand.New(rand.NewSource(seed))
 	for i := 0; i < count; i++ {

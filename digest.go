@@ -21,13 +21,12 @@ import (
 	"math"
 )
 
-// TODO: track max non-empty indices for faster quantiles and merging?
-// TODO: expose size information (number of buckets)
-
 // Digest tracks distribution of values using histograms
 // with exponentially sized buckets.
 type Digest struct {
-	params
+	alpha   float64
+	gamma   float64
+	gammaLn float64
 
 	min float64
 	max float64
@@ -40,69 +39,35 @@ type Digest struct {
 	numPos uint64
 }
 
-type params struct {
-	minVal  float64
-	maxVal  float64
-	alpha   float64
-	gamma   float64
-	gammaLn float64
-}
-
-func (p *params) bucketKey(x float64) int {
-	logGammaX := math.Log(x) / p.gammaLn
-	return int(math.Ceil(logGammaX))
-}
-
-func (p *params) quantile(k int) float64 {
-	powGammaK := math.Exp(float64(k) * p.gammaLn)
-	return 2 * powGammaK / (p.gamma + 1)
-}
-
-// NewDefaultDigest returns digest suitable for values
-// between 1e-6 and 1e6, which covers the range
-// between 1 microsecond and 11.5 days (measured in seconds) or
-// 1 byte and 1 terabyte / 0.9 tebibytes (measured in megabytes).
-func NewDefaultDigest(err float64) *Digest {
-	return NewDigest(1e-6, 1e6, err)
-}
-
 // NewDigest returns digest suitable for calculating quantiles
-// of values between min ∈ (0, 1) and max ∈ (1, math.MaxFloat64)
-// with maximum relative error err ∈ (0, 1).
+// of finite positive values with maximum relative error err ∈ (0, 1).
 //
-// For the given range, size of digest is inversely proportional
-// to the relative error. That is, digest with 2% relative error
-// is twice as small as digest with 1% relative error.
-func NewDigest(min float64, max float64, err float64) *Digest {
-	if math.IsNaN(min) || min <= 0 || min >= 1 {
-		panic("min must be in (0, 1)")
-	}
-	if math.IsNaN(max) || max <= 1 || max >= math.MaxFloat64 {
-		panic("max must be in (1, math.MaxFloat64)")
-	}
+// Size of digest is proportional to the logarithm of minimum
+// and maximum of the values added.
+// Size of digest is inversely proportional to the relative error.
+// That is, digest with 2% relative error is twice as small
+// as digest with 1% relative error.
+func NewDigest(err float64) *Digest {
 	if math.IsNaN(err) || err <= 0 || err >= 1 {
 		panic("err must be in (0, 1)")
 	}
 
-	p := params{
-		minVal:  min,
-		maxVal:  max,
+	return &Digest{
 		alpha:   err,
 		gamma:   1 + 2*err/(1-err),
 		gammaLn: math.Log1p(2 * err / (1 - err)),
-	}
-
-	return &Digest{
-		params: p,
-		min:    math.Inf(1),
-		max:    math.Inf(-1),
-		neg:    make([]uint64, 1-p.bucketKey(p.minVal)),
-		pos:    make([]uint64, p.bucketKey(p.maxVal)),
+		min:     math.Inf(1),
+		max:     math.Inf(-1),
 	}
 }
 
 func (d *Digest) String() string {
-	return fmt.Sprintf("Digest(err=%v%%, min=%v, max=%v)", d.alpha*100, d.minVal, d.maxVal)
+	return fmt.Sprintf("Digest(err=%v%%)", d.alpha*100)
+}
+
+// Size returns the number of histogram buckets.
+func (d *Digest) Size() int {
+	return len(d.neg) + len(d.pos)
 }
 
 // Sum returns the sum of added values.
@@ -118,10 +83,10 @@ func (d *Digest) Count() uint64 {
 // Merge merges the content of v into the digest.
 // Merge preserves relative error guarantees of Quantile.
 //
-// Merge returns an error if digests have different parameters.
+// Merge returns an error if digests have different relative errors.
 func (d *Digest) Merge(v *Digest) error {
-	if v.params != d.params {
-		return fmt.Errorf("can not merge b-digest with params %+v into one with %+v", v.params, d.params)
+	if v.alpha != d.alpha {
+		return fmt.Errorf("can not merge digest with relative error %v%% into one with %v%%", v.alpha*100, d.alpha*100)
 	}
 
 	if v.min < d.min {
@@ -132,9 +97,11 @@ func (d *Digest) Merge(v *Digest) error {
 	}
 	d.addKahan(v.sum)
 
+	d.neg = grow(d.neg, len(v.neg)-1)
 	for i, n := range v.neg {
 		d.neg[i] += n
 	}
+	d.pos = grow(d.pos, len(v.pos)-1)
 	for i, n := range v.pos {
 		d.pos[i] += n
 	}
@@ -144,20 +111,12 @@ func (d *Digest) Merge(v *Digest) error {
 	return nil
 }
 
-// Add adds non-negative value v to the digest.
-// If v is outside of the digest range, v is set to the
-// minimum/maximum value of the range.
+// Add adds finite positive value v to the digest.
 //
-// Add panics if v is negative or NaN.
+// Add panics if v is outside (0, math.MaxFloat64).
 func (d *Digest) Add(v float64) {
-	if math.IsNaN(v) || v < 0 {
-		panic("v must be non-negative")
-	}
-
-	if v < d.minVal {
-		v = d.minVal
-	} else if v > d.maxVal {
-		v = d.maxVal
+	if math.IsNaN(v) || v <= 0 || v >= math.MaxFloat64 {
+		panic("v must be in (0, math.MaxFloat64)")
 	}
 
 	if v < d.min {
@@ -170,9 +129,11 @@ func (d *Digest) Add(v float64) {
 
 	k := d.bucketKey(v)
 	if k < 1 {
+		d.neg = grow(d.neg, -k)
 		d.neg[-k]++
 		d.numNeg++
 	} else {
+		d.pos = grow(d.pos, k-1)
 		d.pos[k-1]++
 		d.numPos++
 	}
@@ -214,6 +175,25 @@ func (d *Digest) addKahan(v float64) {
 	t := d.sum + y
 	d.c = (t - d.sum) - y
 	d.sum = t
+}
+
+func (d *Digest) bucketKey(x float64) int {
+	logGammaX := math.Log(x) / d.gammaLn
+	return int(math.Ceil(logGammaX))
+}
+
+func (d *Digest) quantile(k int) float64 {
+	powGammaK := math.Exp(float64(k) * d.gammaLn)
+	return 2 * powGammaK / (d.gamma + 1)
+}
+
+func grow(buckets []uint64, ix int) []uint64 {
+	n := ix + 1 - len(buckets)
+	if n <= 0 {
+		return buckets
+	}
+
+	return append(buckets, make([]uint64, n)...)
 }
 
 func rankIndexRev(rank uint64, buckets []uint64) int {

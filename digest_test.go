@@ -132,8 +132,6 @@ func (d *approxDigest) Merge(v digest) {
 }
 
 type perfectDigest struct {
-	min    float64
-	max    float64
 	values []float64
 	sorted bool
 }
@@ -186,12 +184,6 @@ func (d *perfectDigest) Merge(v digest) {
 }
 
 func (d *perfectDigest) Add(v float64) {
-	if v < d.min {
-		v = d.min
-	} else if v > d.max {
-		v = d.max
-	}
-
 	d.values = append(d.values, v)
 	d.sorted = false
 }
@@ -242,10 +234,10 @@ func (m *digestMachine) Init(t *rapid.T) {
 	m.err = rapid.Float64Range(minErr, 1-1e-5).Draw(t, "relative error").(float64)
 }
 
-func (m *digestMachine) Check(_ *rapid.T) {}
+func (m *digestMachine) Check(*rapid.T) {}
 
 func (m *digestMachine) AddDigest(t *rapid.T) {
-	maxSize := 100000
+	maxSize := 10000
 	if testing.Short() {
 		maxSize = 1000
 	}
@@ -254,14 +246,20 @@ func (m *digestMachine) AddDigest(t *rapid.T) {
 	seed := rapid.Int64().Draw(t, "seed").(int64)
 	count := rapid.IntRange(0, maxSize).Draw(t, "count").(int)
 
-	d := &approxDigest{bdigest.NewDigest(m.min, m.max, m.err)}
-	r := &perfectDigest{min: m.min, max: m.max, values: make([]float64, 0, count)}
+	d := &approxDigest{bdigest.NewDigest(m.err)}
+	r := &perfectDigest{values: make([]float64, 0, count)}
 	t.Logf("using %v/%v for %v:", gen, count, d.Digest)
 
 	g := generators[gen](t, m.min, m.max)
 	g.Seed(seed)
 	for i := 0; i < count; i++ {
-		f := math.Abs(g.Gen())
+		f := g.Gen()
+		if f < m.min {
+			f = m.min
+		} else if f > m.max {
+			f = m.max
+		}
+
 		t.Logf("adding %v", f)
 		d.Add(f)
 		r.Add(f)
