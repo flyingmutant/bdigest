@@ -59,11 +59,7 @@ func BenchmarkDigest_Add(b *testing.B) {
 func BenchmarkDigest_Quantile(b *testing.B) {
 	for _, err := range errors {
 		b.Run(fmt.Sprintf("%v", err), func(b *testing.B) {
-			r := rand.New(rand.NewSource(0))
-			d := bdigest.NewDefaultDigest(err)
-			for i := 0; i < 100000; i++ {
-				d.Add(math.Exp(r.NormFloat64()))
-			}
+			d := logNormalDigest(err, 0, 100000)
 
 			for _, q := range quantiles {
 				b.Run(fmt.Sprintf("q%v", q), func(b *testing.B) {
@@ -79,13 +75,8 @@ func BenchmarkDigest_Quantile(b *testing.B) {
 func BenchmarkDigest_Merge(b *testing.B) {
 	for _, err := range errors {
 		b.Run(fmt.Sprintf("%v", err), func(b *testing.B) {
-			r := rand.New(rand.NewSource(0))
-			d1 := bdigest.NewDefaultDigest(err)
-			d2 := bdigest.NewDefaultDigest(err)
-			for i := 0; i < 100000; i++ {
-				d1.Add(math.Exp(r.NormFloat64()))
-				d2.Add(math.Exp(r.NormFloat64()))
-			}
+			d1 := logNormalDigest(err, 0, 100000)
+			d2 := logNormalDigest(err, 1, 100000)
 			b.ResetTimer()
 
 			for i := 0; i < b.N; i++ {
@@ -93,4 +84,15 @@ func BenchmarkDigest_Merge(b *testing.B) {
 			}
 		})
 	}
+}
+
+func logNormalDigest(err float64, seed int64, count int) *bdigest.Digest {
+	d := bdigest.NewDefaultDigest(err)
+
+	r := rand.New(rand.NewSource(seed))
+	for i := 0; i < count; i++ {
+		d.Add(math.Exp(r.NormFloat64()))
+	}
+
+	return d
 }
