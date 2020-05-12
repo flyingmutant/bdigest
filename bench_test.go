@@ -86,6 +86,43 @@ func BenchmarkDigest_Merge(b *testing.B) {
 	}
 }
 
+func BenchmarkDigest_MarshalBinary(b *testing.B) {
+	for _, err := range errors {
+		b.Run(fmt.Sprintf("%v", err), func(b *testing.B) {
+			d := logNormalDigest(err, 0, 100000)
+			b.ResetTimer()
+
+			for i := 0; i < b.N; i++ {
+				_, err := d.MarshalBinary()
+				if err != nil {
+					b.Fatalf("unexpected error during marshaling: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkDigest_UnmarshalBinary(b *testing.B) {
+	for _, err := range errors {
+		b.Run(fmt.Sprintf("%v", err), func(b *testing.B) {
+			d1 := logNormalDigest(err, 0, 100000)
+			d2 := &bdigest.Digest{}
+			buf, err := d1.MarshalBinary()
+			if err != nil {
+				b.Fatalf("unexpected error during marshaling: %v", err)
+			}
+			b.ResetTimer()
+
+			for i := 0; i < b.N; i++ {
+				err := d2.UnmarshalBinary(buf)
+				if err != nil {
+					b.Fatalf("unexpected error during unmarshaling: %v", err)
+				}
+			}
+		})
+	}
+}
+
 func logNormalDigest(err float64, seed int64, count int) *bdigest.Digest {
 	d := bdigest.NewDigest(err)
 
