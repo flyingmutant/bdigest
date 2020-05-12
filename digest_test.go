@@ -17,6 +17,7 @@ package bdigest_test
 import (
 	"math"
 	"math/rand"
+	"reflect"
 	"sort"
 	"testing"
 
@@ -310,5 +311,41 @@ func checkDigest(t *rapid.T, d digest, r digest, q float64, err float64) {
 	}
 	if re > maxErr && (re-maxErr)/maxErr > 1e-9 {
 		t.Errorf("q%v error is %v%% instead of max %v%% (%v instead of %v)", q, re*100, maxErr*100, dq, rq)
+	}
+}
+
+func TestDigestMarshalBinaryRoundtrip(t *testing.T) {
+	t.Parallel()
+
+	rapid.Check(t, testDigestMarshalBinaryRoundtrip)
+}
+
+func testDigestMarshalBinaryRoundtrip(t *rapid.T) {
+	var (
+		relErr = rapid.Float64Range(1e-5, 1-1e-5).Draw(t, "relative error").(float64)
+		seed   = rapid.Int64().Draw(t, "seed").(int64)
+		count  = rapid.IntRange(0, 100000).Draw(t, "count").(int)
+		ctor   = rapid.Bool().Draw(t, "use constructor").(bool)
+	)
+
+	d1 := logNormalDigest(relErr, seed, count)
+	data, err := d1.MarshalBinary()
+	if err != nil {
+		t.Fatalf("failed to marshal digest: %v", err)
+	}
+
+	var d2 *bdigest.Digest
+	if ctor {
+		d2 = bdigest.NewDigest(relErr)
+	} else {
+		d2 = &bdigest.Digest{}
+	}
+	err = d2.UnmarshalBinary(data)
+	if err != nil {
+		t.Fatalf("failed to unmarshal digest: %v", err)
+	}
+
+	if !reflect.DeepEqual(d1, d2) {
+		t.Fatalf("got back %#v which is different than %#v", d2, d1)
 	}
 }

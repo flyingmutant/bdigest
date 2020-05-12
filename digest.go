@@ -17,8 +17,16 @@
 package bdigest
 
 import (
+	"encoding/binary"
 	"fmt"
 	"math"
+)
+
+const (
+	headerSize = 1*8 + // alpha
+		4*8 + // min, max, sum, c
+		2*8 + // numNeg, numPos
+		2*4 // len(neg), len(pos)
 )
 
 // Digest tracks distribution of values using histograms
@@ -168,6 +176,111 @@ func (d *Digest) Quantile(q float64) float64 {
 		i := rankIndex(rank-d.numNeg, d.pos)
 		return d.quantile(i + 1)
 	}
+}
+
+// MarshalBinary implements the encoding.BinaryMarshaler interface.
+func (d *Digest) MarshalBinary() ([]byte, error) {
+	size := headerSize + len(d.neg)*8 + len(d.pos)*8
+	buf := make([]byte, size)
+	le := binary.LittleEndian
+	i := 0
+
+	le.PutUint64(buf[i:], math.Float64bits(d.alpha))
+	i += 8
+	le.PutUint64(buf[i:], math.Float64bits(d.min))
+	i += 8
+	le.PutUint64(buf[i:], math.Float64bits(d.max))
+	i += 8
+	le.PutUint64(buf[i:], math.Float64bits(d.sum))
+	i += 8
+	le.PutUint64(buf[i:], math.Float64bits(d.c))
+	i += 8
+	le.PutUint64(buf[i:], d.numNeg)
+	i += 8
+	le.PutUint64(buf[i:], d.numPos)
+	i += 8
+	le.PutUint32(buf[i:], uint32(len(d.neg)))
+	i += 4
+	le.PutUint32(buf[i:], uint32(len(d.pos)))
+	i += 4
+	for _, b := range d.neg {
+		le.PutUint64(buf[i:], b)
+		i += 8
+	}
+	for _, b := range d.pos {
+		le.PutUint64(buf[i:], b)
+		i += 8
+	}
+
+	return buf, nil
+}
+
+// UnmarshalBinary implements the encoding.BinaryUnmarshaler interface.
+func (d *Digest) UnmarshalBinary(data []byte) error {
+	if len(data) < headerSize {
+		return fmt.Errorf("not enough data to read header: %v bytes instead of minimum %v", len(data), headerSize)
+	}
+
+	le := binary.LittleEndian
+	i := 0
+
+	alpha := math.Float64frombits(le.Uint64(data[i:]))
+	i += 8
+	if math.IsNaN(alpha) || alpha <= 0 || alpha >= 1 {
+		return fmt.Errorf("invalid relative error %v", alpha)
+	}
+	min := math.Float64frombits(le.Uint64(data[i:]))
+	i += 8
+	max := math.Float64frombits(le.Uint64(data[i:]))
+	i += 8
+	sum := math.Float64frombits(le.Uint64(data[i:]))
+	i += 8
+	c := math.Float64frombits(le.Uint64(data[i:]))
+	i += 8
+	numNeg := le.Uint64(data[i:])
+	i += 8
+	numPos := le.Uint64(data[i:])
+	i += 8
+	lenNeg := le.Uint32(data[i:])
+	i += 4
+	lenPos := le.Uint32(data[i:])
+	i += 4
+
+	if uint32(len(data[i:])) < (lenNeg+lenPos)*8 {
+		return fmt.Errorf("not enough data to read histograms: %v bytes instead of minimum %v", len(data[i:]), (lenNeg+lenPos)*8)
+	}
+	var neg []uint64
+	if lenNeg > 0 {
+		neg = make([]uint64, lenNeg)
+		for j := range neg {
+			neg[j] = le.Uint64(data[i:])
+			i += 8
+		}
+	}
+	var pos []uint64
+	if lenPos > 0 {
+		pos = make([]uint64, lenPos)
+		for j := range pos {
+			pos[j] = le.Uint64(data[i:])
+			i += 8
+		}
+	}
+
+	*d = Digest{
+		alpha:   alpha,
+		gamma:   1 + 2*alpha/(1-alpha),
+		gammaLn: math.Log1p(2 * alpha / (1 - alpha)),
+		min:     min,
+		max:     max,
+		sum:     sum,
+		c:       c,
+		neg:     neg,
+		pos:     pos,
+		numNeg:  numNeg,
+		numPos:  numPos,
+	}
+
+	return nil
 }
 
 func (d *Digest) addKahan(v float64) {
