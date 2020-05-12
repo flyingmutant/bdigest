@@ -23,6 +23,10 @@ import (
 	"pgregory.net/bdigest"
 )
 
+const (
+	benchElemCount = 100 * 1000
+)
+
 var (
 	errors    = []float64{0.001, 0.01, 0.05}
 	quantiles = []float64{0, 0.001, 0.01, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99, 0.999, 0.9999, 1}
@@ -59,7 +63,7 @@ func BenchmarkDigest_Add(b *testing.B) {
 func BenchmarkDigest_Quantile(b *testing.B) {
 	for _, err := range errors {
 		b.Run(fmt.Sprintf("%v", err), func(b *testing.B) {
-			d := logNormalDigest(err, 0, 100000)
+			d := logNormalDigest(err, 0, benchElemCount)
 
 			for _, q := range quantiles {
 				b.Run(fmt.Sprintf("q%v", q), func(b *testing.B) {
@@ -75,8 +79,8 @@ func BenchmarkDigest_Quantile(b *testing.B) {
 func BenchmarkDigest_Merge(b *testing.B) {
 	for _, err := range errors {
 		b.Run(fmt.Sprintf("%v", err), func(b *testing.B) {
-			d1 := logNormalDigest(err, 0, 100000)
-			d2 := logNormalDigest(err, 1, 100000)
+			d1 := logNormalDigest(err, 0, benchElemCount)
+			d2 := logNormalDigest(err, 1, benchElemCount)
 			b.ResetTimer()
 
 			for i := 0; i < b.N; i++ {
@@ -89,7 +93,7 @@ func BenchmarkDigest_Merge(b *testing.B) {
 func BenchmarkDigest_MarshalBinary(b *testing.B) {
 	for _, err := range errors {
 		b.Run(fmt.Sprintf("%v", err), func(b *testing.B) {
-			d := logNormalDigest(err, 0, 100000)
+			d := logNormalDigest(err, 0, benchElemCount)
 			b.ResetTimer()
 
 			for i := 0; i < b.N; i++ {
@@ -105,7 +109,7 @@ func BenchmarkDigest_MarshalBinary(b *testing.B) {
 func BenchmarkDigest_UnmarshalBinary(b *testing.B) {
 	for _, err := range errors {
 		b.Run(fmt.Sprintf("%v", err), func(b *testing.B) {
-			d1 := logNormalDigest(err, 0, 100000)
+			d1 := logNormalDigest(err, 0, benchElemCount)
 			d2 := &bdigest.Digest{}
 			buf, err := d1.MarshalBinary()
 			if err != nil {
