@@ -25,7 +25,6 @@ import (
 const (
 	headerSize = 1*8 + // alpha
 		4*8 + // min, max, sum, c
-		2*8 + // numNeg, numPos
 		2*4 // len(neg), len(pos)
 )
 
@@ -195,10 +194,6 @@ func (d *Digest) MarshalBinary() ([]byte, error) {
 	i += 8
 	le.PutUint64(buf[i:], math.Float64bits(d.c))
 	i += 8
-	le.PutUint64(buf[i:], d.numNeg)
-	i += 8
-	le.PutUint64(buf[i:], d.numPos)
-	i += 8
 	le.PutUint32(buf[i:], uint32(len(d.neg)))
 	i += 4
 	le.PutUint32(buf[i:], uint32(len(d.pos)))
@@ -237,10 +232,6 @@ func (d *Digest) UnmarshalBinary(data []byte) error {
 	i += 8
 	c := math.Float64frombits(le.Uint64(data[i:]))
 	i += 8
-	numNeg := le.Uint64(data[i:])
-	i += 8
-	numPos := le.Uint64(data[i:])
-	i += 8
 	lenNeg := le.Uint32(data[i:])
 	i += 4
 	lenPos := le.Uint32(data[i:])
@@ -250,18 +241,24 @@ func (d *Digest) UnmarshalBinary(data []byte) error {
 		return fmt.Errorf("not enough data to read histograms: %v bytes instead of minimum %v", len(data[i:]), (lenNeg+lenPos)*8)
 	}
 	var neg []uint64
+	numNeg := uint64(0)
 	if lenNeg > 0 {
 		neg = make([]uint64, lenNeg)
 		for j := range neg {
-			neg[j] = le.Uint64(data[i:])
+			v := le.Uint64(data[i:])
+			numNeg += v
+			neg[j] = v
 			i += 8
 		}
 	}
 	var pos []uint64
+	numPos := uint64(0)
 	if lenPos > 0 {
 		pos = make([]uint64, lenPos)
 		for j := range pos {
-			pos[j] = le.Uint64(data[i:])
+			v := le.Uint64(data[i:])
+			numPos += v
+			pos[j] = v
 			i += 8
 		}
 	}
