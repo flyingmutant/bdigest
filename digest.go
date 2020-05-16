@@ -139,11 +139,11 @@ func (d *Digest) Quantile(q float64) float64 {
 
 	rank := uint64(1 + q*float64(d.Count()-1))
 	if rank <= d.numNeg {
-		i := rankIndexRev(rank, d.neg)
-		return d.quantile(-i)
+		k := rankIndexRev(rank, d.neg)
+		return d.quantile(-k)
 	} else {
-		i := rankIndex(rank-d.numNeg, d.pos)
-		return d.quantile(i + 1)
+		k := rankIndex(rank-d.numNeg, d.pos)
+		return d.quantile(k + 1)
 	}
 }
 
