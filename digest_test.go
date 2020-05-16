@@ -114,7 +114,6 @@ func (g *logNormalGen) Gen() float64 { return math.Exp(g.mu + g.NormFloat64()*g.
 func (g *paretoGen) Gen() float64    { return g.min * math.Exp(g.ExpFloat64()/g.index) }
 
 type digest interface {
-	Sum() float64
 	Count() uint64
 	Merge(digest)
 	Add(float64)
@@ -135,19 +134,6 @@ func (d *approxDigest) Merge(v digest) {
 type perfectDigest struct {
 	values []float64
 	sorted bool
-}
-
-func (d *perfectDigest) Sum() float64 {
-	if !d.sorted {
-		sort.Float64s(d.values)
-		d.sorted = true
-	}
-
-	s := 0.0
-	for _, v := range d.values {
-		s += v
-	}
-	return s
 }
 
 func (d *perfectDigest) Count() uint64 {
@@ -290,12 +276,6 @@ func (m *digestMachine) MergeDigests(t *rapid.T) {
 func checkDigest(t *rapid.T, d digest, r digest, q float64, err float64) {
 	t.Helper()
 
-	ds := d.Sum()
-	rs := r.Sum()
-	if math.Abs(ds-rs)/rs > 1e-6 {
-		t.Errorf("sum is %v instead of %v", ds, rs)
-	}
-
 	dc := d.Count()
 	rc := r.Count()
 	if dc != rc {
@@ -305,12 +285,8 @@ func checkDigest(t *rapid.T, d digest, r digest, q float64, err float64) {
 	dq := d.Quantile(q)
 	rq := r.Quantile(q)
 	re := math.Abs(dq-rq) / rq
-	maxErr := err
-	if q == 0 || q == 1 {
-		maxErr = 0
-	}
-	if re > maxErr && (re-maxErr)/maxErr > 1e-9 {
-		t.Errorf("q%v error is %v%% instead of max %v%% (%v instead of %v)", q, re*100, maxErr*100, dq, rq)
+	if re > err && (re-err)/err > 1e-9 {
+		t.Errorf("q%v error is %v%% instead of max %v%% (%v instead of %v)", q, re*100, err*100, dq, rq)
 	}
 }
 

@@ -23,9 +23,7 @@ import (
 )
 
 const (
-	headerSize = 1*8 + // alpha
-		4*8 + // min, max, sum, c
-		2*4 // len(neg), len(pos)
+	headerSize = 8 /* alpha */ + 2*4 /* len(neg), len(pos) */
 )
 
 // Digest tracks distribution of values using histograms
@@ -34,16 +32,10 @@ type Digest struct {
 	alpha   float64
 	gamma   float64
 	gammaLn float64
-
-	min float64
-	max float64
-	sum float64
-	c   float64
-
-	neg    []uint64
-	pos    []uint64
-	numNeg uint64
-	numPos uint64
+	neg     []uint64
+	pos     []uint64
+	numNeg  uint64
+	numPos  uint64
 }
 
 // NewDigest returns digest suitable for calculating quantiles
@@ -63,8 +55,6 @@ func NewDigest(err float64) *Digest {
 		alpha:   err,
 		gamma:   1 + 2*err/(1-err),
 		gammaLn: math.Log1p(2 * err / (1 - err)),
-		min:     math.Inf(1),
-		max:     math.Inf(-1),
 	}
 }
 
@@ -75,11 +65,6 @@ func (d *Digest) String() string {
 // Size returns the number of histogram buckets.
 func (d *Digest) Size() int {
 	return len(d.neg) + len(d.pos)
-}
-
-// Sum returns the sum of added values.
-func (d *Digest) Sum() float64 {
-	return d.sum
 }
 
 // Count returns the number of added values.
@@ -95,14 +80,6 @@ func (d *Digest) Merge(v *Digest) error {
 	if v.alpha != d.alpha {
 		return fmt.Errorf("can not merge digest with relative error %v%% into one with %v%%", v.alpha*100, d.alpha*100)
 	}
-
-	if v.min < d.min {
-		d.min = v.min
-	}
-	if v.max > d.max {
-		d.max = v.max
-	}
-	d.addKahan(v.sum)
 
 	d.neg = grow(d.neg, len(v.neg)-1)
 	for i, n := range v.neg {
@@ -126,14 +103,6 @@ func (d *Digest) Add(v float64) {
 		panic("v must be in (0, math.MaxFloat64)")
 	}
 
-	if v < d.min {
-		d.min = v
-	}
-	if v > d.max {
-		d.max = v
-	}
-	d.addKahan(v)
-
 	k := d.bucketKey(v)
 	if k < 1 {
 		d.neg = grow(d.neg, -k)
@@ -146,9 +115,8 @@ func (d *Digest) Add(v float64) {
 	}
 }
 
-// Quantile returns the q-quantile of added values.
-// Minimum (0-quantile) and maximum (1-quantile) are exact,
-// other quantiles have maximum relative error of err.
+// Quantile returns the q-quantile of added values
+// with a maximum relative error of err.
 //
 // Quantile panics if q is outside [0, 1].
 // Quantile returns NaN for empty digest.
@@ -159,12 +127,6 @@ func (d *Digest) Quantile(q float64) float64 {
 
 	if d.Count() == 0 {
 		return math.NaN()
-	}
-
-	if q == 0 {
-		return d.min
-	} else if q == 1 {
-		return d.max
 	}
 
 	rank := uint64(1 + q*float64(d.Count()-1))
@@ -185,14 +147,6 @@ func (d *Digest) MarshalBinary() ([]byte, error) {
 	i := 0
 
 	le.PutUint64(buf[i:], math.Float64bits(d.alpha))
-	i += 8
-	le.PutUint64(buf[i:], math.Float64bits(d.min))
-	i += 8
-	le.PutUint64(buf[i:], math.Float64bits(d.max))
-	i += 8
-	le.PutUint64(buf[i:], math.Float64bits(d.sum))
-	i += 8
-	le.PutUint64(buf[i:], math.Float64bits(d.c))
 	i += 8
 	le.PutUint32(buf[i:], uint32(len(d.neg)))
 	i += 4
@@ -224,14 +178,6 @@ func (d *Digest) UnmarshalBinary(data []byte) error {
 	if math.IsNaN(alpha) || alpha <= 0 || alpha >= 1 {
 		return fmt.Errorf("invalid relative error %v", alpha)
 	}
-	min := math.Float64frombits(le.Uint64(data[i:]))
-	i += 8
-	max := math.Float64frombits(le.Uint64(data[i:]))
-	i += 8
-	sum := math.Float64frombits(le.Uint64(data[i:]))
-	i += 8
-	c := math.Float64frombits(le.Uint64(data[i:]))
-	i += 8
 	lenNeg := le.Uint32(data[i:])
 	i += 4
 	lenPos := le.Uint32(data[i:])
@@ -267,10 +213,6 @@ func (d *Digest) UnmarshalBinary(data []byte) error {
 		alpha:   alpha,
 		gamma:   1 + 2*alpha/(1-alpha),
 		gammaLn: math.Log1p(2 * alpha / (1 - alpha)),
-		min:     min,
-		max:     max,
-		sum:     sum,
-		c:       c,
 		neg:     neg,
 		pos:     pos,
 		numNeg:  numNeg,
@@ -278,13 +220,6 @@ func (d *Digest) UnmarshalBinary(data []byte) error {
 	}
 
 	return nil
-}
-
-func (d *Digest) addKahan(v float64) {
-	y := v - d.c
-	t := d.sum + y
-	d.c = (t - d.sum) - y
-	d.sum = t
 }
 
 func (d *Digest) bucketKey(x float64) int {
