@@ -325,3 +325,24 @@ func testDigestMarshalBinaryRoundtrip(t *rapid.T) {
 		t.Fatalf("got back %#v which is different than %#v", d2, d1)
 	}
 }
+
+func TestDigest_Reset(t *testing.T) {
+	t.Parallel()
+
+	rapid.Check(t, func(t *rapid.T) {
+		var (
+			err   = rapid.Float64Range(1e-5, 1-1e-5).Draw(t, "relative error").(float64)
+			seed  = rapid.Int64().Draw(t, "seed").(int64)
+			count = rapid.IntRange(0, 100000).Draw(t, "count").(int)
+		)
+
+		d := logNormalDigest(err, seed, count)
+		d.Reset()
+		if d.Count() != 0 {
+			t.Errorf("reset has left %v elements behind", d.Count())
+		}
+		if d.Size() != 0 {
+			t.Errorf("reset has left %v buckets behind", d.Size())
+		}
+	})
+}

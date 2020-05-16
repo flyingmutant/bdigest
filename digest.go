@@ -58,6 +58,14 @@ func NewDigest(err float64) *Digest {
 	}
 }
 
+// Reset resets digest to the initial empty state.
+func (d *Digest) Reset() {
+	d.neg = d.neg[:0]
+	d.pos = d.pos[:0]
+	d.numNeg = 0
+	d.numPos = 0
+}
+
 func (d *Digest) String() string {
 	return fmt.Sprintf("Digest(err=%v%%)", d.alpha*100)
 }
