@@ -143,21 +143,20 @@ func (d *Digest) Quantile(q float64) float64 {
 func (d *Digest) MarshalBinary() ([]byte, error) {
 	size := headerSize + len(d.neg)*8 + len(d.pos)*8
 	buf := make([]byte, size)
-	le := binary.LittleEndian
 	i := 0
 
-	le.PutUint64(buf[i:], math.Float64bits(d.alpha))
+	binary.LittleEndian.PutUint64(buf[i:], math.Float64bits(d.alpha))
 	i += 8
-	le.PutUint32(buf[i:], uint32(len(d.neg)))
+	binary.LittleEndian.PutUint32(buf[i:], uint32(len(d.neg)))
 	i += 4
-	le.PutUint32(buf[i:], uint32(len(d.pos)))
+	binary.LittleEndian.PutUint32(buf[i:], uint32(len(d.pos)))
 	i += 4
 	for _, b := range d.neg {
-		le.PutUint64(buf[i:], b)
+		binary.LittleEndian.PutUint64(buf[i:], b)
 		i += 8
 	}
 	for _, b := range d.pos {
-		le.PutUint64(buf[i:], b)
+		binary.LittleEndian.PutUint64(buf[i:], b)
 		i += 8
 	}
 
@@ -170,17 +169,15 @@ func (d *Digest) UnmarshalBinary(data []byte) error {
 		return fmt.Errorf("not enough data to read header: %v bytes instead of minimum %v", len(data), headerSize)
 	}
 
-	le := binary.LittleEndian
 	i := 0
-
-	alpha := math.Float64frombits(le.Uint64(data[i:]))
+	alpha := math.Float64frombits(binary.LittleEndian.Uint64(data[i:]))
 	i += 8
 	if math.IsNaN(alpha) || alpha <= 0 || alpha >= 1 {
 		return fmt.Errorf("invalid relative error %v", alpha)
 	}
-	lenNeg := le.Uint32(data[i:])
+	lenNeg := binary.LittleEndian.Uint32(data[i:])
 	i += 4
-	lenPos := le.Uint32(data[i:])
+	lenPos := binary.LittleEndian.Uint32(data[i:])
 	i += 4
 
 	if uint32(len(data[i:])) < (lenNeg+lenPos)*8 {
@@ -191,7 +188,7 @@ func (d *Digest) UnmarshalBinary(data []byte) error {
 	if lenNeg > 0 {
 		neg = make([]uint64, lenNeg)
 		for j := range neg {
-			v := le.Uint64(data[i:])
+			v := binary.LittleEndian.Uint64(data[i:])
 			numNeg += v
 			neg[j] = v
 			i += 8
@@ -202,7 +199,7 @@ func (d *Digest) UnmarshalBinary(data []byte) error {
 	if lenPos > 0 {
 		pos = make([]uint64, lenPos)
 		for j := range pos {
-			v := le.Uint64(data[i:])
+			v := binary.LittleEndian.Uint64(data[i:])
 			numPos += v
 			pos[j] = v
 			i += 8
