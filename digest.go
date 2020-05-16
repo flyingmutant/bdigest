@@ -180,8 +180,8 @@ func (d *Digest) UnmarshalBinary(data []byte) error {
 	lenPos := binary.LittleEndian.Uint32(data[i:])
 	i += 4
 
-	if uint32(len(data[i:])) < (lenNeg+lenPos)*8 {
-		return fmt.Errorf("not enough data to read histograms: %v bytes instead of minimum %v", len(data[i:]), (lenNeg+lenPos)*8)
+	if uint32(len(data[i:])) != (lenNeg+lenPos)*8 {
+		return fmt.Errorf("wrong histograms data size: %v bytes instead of %v", len(data[i:]), (lenNeg+lenPos)*8)
 	}
 	var neg []uint64
 	numNeg := uint64(0)
