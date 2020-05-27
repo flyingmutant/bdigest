@@ -241,7 +241,9 @@ func (m *digestMachine) AddDigest(t *rapid.T) {
 	g.Seed(seed)
 	for i := 0; i < count; i++ {
 		f := g.Gen()
-		if f < m.min {
+		if f <= 0 {
+			f = 0
+		} else if f < m.min {
 			f = m.min
 		} else if f > m.max {
 			f = m.max
@@ -304,7 +306,7 @@ func testDigestMarshalBinaryRoundtrip(t *rapid.T) {
 		ctor   = rapid.Bool().Draw(t, "use constructor").(bool)
 	)
 
-	d1 := logNormalDigest(relErr, seed, count)
+	d1 := logNormalDigest(relErr, seed, count, int32(count)/10)
 	data, err := d1.MarshalBinary()
 	if err != nil {
 		t.Fatalf("failed to marshal digest: %v", err)
@@ -336,7 +338,7 @@ func TestDigest_Reset(t *testing.T) {
 			count = rapid.IntRange(0, 100000).Draw(t, "count").(int)
 		)
 
-		d := logNormalDigest(err, seed, count)
+		d := logNormalDigest(err, seed, count, int32(count)/10)
 		d.Reset()
 		if d.Count() != 0 {
 			t.Errorf("reset has left %v elements behind", d.Count())

@@ -63,7 +63,7 @@ func BenchmarkDigest_Add(b *testing.B) {
 func BenchmarkDigest_Quantile(b *testing.B) {
 	for _, err := range errors {
 		b.Run(fmt.Sprintf("%v", err), func(b *testing.B) {
-			d := logNormalDigest(err, 0, benchElemCount)
+			d := logNormalDigest(err, 0, benchElemCount, 0)
 
 			for _, q := range quantiles {
 				b.Run(fmt.Sprintf("q%v", q), func(b *testing.B) {
@@ -79,8 +79,8 @@ func BenchmarkDigest_Quantile(b *testing.B) {
 func BenchmarkDigest_Merge(b *testing.B) {
 	for _, err := range errors {
 		b.Run(fmt.Sprintf("%v", err), func(b *testing.B) {
-			d1 := logNormalDigest(err, 0, benchElemCount)
-			d2 := logNormalDigest(err, 1, benchElemCount)
+			d1 := logNormalDigest(err, 0, benchElemCount, 0)
+			d2 := logNormalDigest(err, 1, benchElemCount, 0)
 			b.ResetTimer()
 
 			for i := 0; i < b.N; i++ {
@@ -93,7 +93,7 @@ func BenchmarkDigest_Merge(b *testing.B) {
 func BenchmarkDigest_MarshalBinary(b *testing.B) {
 	for _, err := range errors {
 		b.Run(fmt.Sprintf("%v", err), func(b *testing.B) {
-			d := logNormalDigest(err, 0, benchElemCount)
+			d := logNormalDigest(err, 0, benchElemCount, 0)
 			b.ResetTimer()
 
 			for i := 0; i < b.N; i++ {
@@ -109,7 +109,7 @@ func BenchmarkDigest_MarshalBinary(b *testing.B) {
 func BenchmarkDigest_UnmarshalBinary(b *testing.B) {
 	for _, err := range errors {
 		b.Run(fmt.Sprintf("%v", err), func(b *testing.B) {
-			d1 := logNormalDigest(err, 0, benchElemCount)
+			d1 := logNormalDigest(err, 0, benchElemCount, 0)
 			d2 := &bdigest.Digest{}
 			buf, err := d1.MarshalBinary()
 			if err != nil {
@@ -127,12 +127,16 @@ func BenchmarkDigest_UnmarshalBinary(b *testing.B) {
 	}
 }
 
-func logNormalDigest(err float64, seed int64, count int) *bdigest.Digest {
+func logNormalDigest(err float64, seed int64, count int, zeroChance int32) *bdigest.Digest {
 	d := bdigest.NewDigest(err)
 
 	r := rand.New(rand.NewSource(seed))
 	for i := 0; i < count; i++ {
-		d.Add(math.Exp(r.NormFloat64()))
+		if zeroChance > 0 && r.Int31n(zeroChance) == 0 {
+			d.Add(0)
+		} else {
+			d.Add(math.Exp(r.NormFloat64()))
+		}
 	}
 
 	return d

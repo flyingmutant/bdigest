@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	headerSize = 8 /* alpha */ + 2*4 /* len(neg), len(pos) */
+	headerSize = 8 /* alpha */ + 8 /* numZero */ + 2*4 /* len(neg), len(pos) */
 )
 
 // Digest tracks distribution of values using histograms
@@ -36,10 +36,11 @@ type Digest struct {
 	pos     []uint64
 	numNeg  uint64
 	numPos  uint64
+	numZero uint64
 }
 
 // NewDigest returns digest suitable for calculating quantiles
-// of finite positive values with maximum relative error err ∈ (0, 1).
+// of finite non-negative values with maximum relative error err ∈ (0, 1).
 //
 // Size of digest is proportional to the logarithm of minimum
 // and maximum of the values added.
@@ -64,6 +65,7 @@ func (d *Digest) Reset() {
 	d.pos = d.pos[:0]
 	d.numNeg = 0
 	d.numPos = 0
+	d.numZero = 0
 }
 
 func (d *Digest) String() string {
@@ -77,7 +79,7 @@ func (d *Digest) Size() int {
 
 // Count returns the number of added values.
 func (d *Digest) Count() uint64 {
-	return d.numNeg + d.numPos
+	return d.numNeg + d.numPos + d.numZero
 }
 
 // Merge merges the content of v into the digest.
@@ -99,16 +101,22 @@ func (d *Digest) Merge(v *Digest) error {
 	}
 	d.numNeg += v.numNeg
 	d.numPos += v.numPos
+	d.numZero += v.numZero
 
 	return nil
 }
 
-// Add adds finite positive value v to the digest.
+// Add adds finite non-negative value v to the digest.
 //
-// Add panics if v is outside (0, math.MaxFloat64).
+// Add panics if v is outside [0, math.MaxFloat64].
 func (d *Digest) Add(v float64) {
-	if math.IsNaN(v) || v <= 0 || v >= math.MaxFloat64 {
-		panic("v must be in (0, math.MaxFloat64)")
+	if math.IsNaN(v) || v < 0 || v > math.MaxFloat64 {
+		panic("v must be in [0, math.MaxFloat64]")
+	}
+
+	if v == 0 {
+		d.numZero++
+		return
 	}
 
 	k := d.bucketKey(v)
@@ -138,11 +146,13 @@ func (d *Digest) Quantile(q float64) float64 {
 	}
 
 	rank := uint64(1 + q*float64(d.Count()-1))
-	if rank <= d.numNeg {
-		k := rankIndexRev(rank, d.neg)
+	if rank <= d.numZero {
+		return 0
+	} else if rank <= d.numZero+d.numNeg {
+		k := rankIndexRev(rank-d.numZero, d.neg)
 		return d.quantile(-k)
 	} else {
-		k := rankIndex(rank-d.numNeg, d.pos)
+		k := rankIndex(rank-d.numZero-d.numNeg, d.pos)
 		return d.quantile(k + 1)
 	}
 }
@@ -154,6 +164,8 @@ func (d *Digest) MarshalBinary() ([]byte, error) {
 	i := 0
 
 	binary.LittleEndian.PutUint64(buf[i:], math.Float64bits(d.alpha))
+	i += 8
+	binary.LittleEndian.PutUint64(buf[i:], d.numZero)
 	i += 8
 	binary.LittleEndian.PutUint32(buf[i:], uint32(len(d.neg)))
 	i += 4
@@ -183,6 +195,8 @@ func (d *Digest) UnmarshalBinary(data []byte) error {
 	if math.IsNaN(alpha) || alpha <= 0 || alpha >= 1 {
 		return fmt.Errorf("invalid relative error %v", alpha)
 	}
+	numZero := binary.LittleEndian.Uint64(data[i:])
+	i += 8
 	lenNeg := binary.LittleEndian.Uint32(data[i:])
 	i += 4
 	lenPos := binary.LittleEndian.Uint32(data[i:])
@@ -222,6 +236,7 @@ func (d *Digest) UnmarshalBinary(data []byte) error {
 		pos:     pos,
 		numNeg:  numNeg,
 		numPos:  numPos,
+		numZero: numZero,
 	}
 
 	return nil
