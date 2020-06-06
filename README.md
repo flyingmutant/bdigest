@@ -44,6 +44,10 @@ func ExampleNewDigest() {
 }
 ```
 
+## License
+
+b-digest is licensed under the [Apache License Version 2.0](./LICENSE).
+
 [godoc-img]: https://godoc.org/pgregory.net/bdigest?status.svg
 [godoc]: https://godoc.org/pgregory.net/bdigest
 [ci-img]: https://github.com/flyingmutant/bdigest/workflows/CI/badge.svg
