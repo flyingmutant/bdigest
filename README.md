@@ -1,6 +1,6 @@
 # b-digest [![GoDoc][godoc-img]][godoc] [![CI][ci-img]][ci]
 
-b-digest is a library for fast and memory-efficient estimation
+b-digest is a Go library for fast and memory-efficient estimation
 of quantiles with guaranteed relative error and full mergeability.
 
 ```go
