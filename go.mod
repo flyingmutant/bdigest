@@ -1,5 +1,5 @@
 module pgregory.net/bdigest
 
-go 1.13
+go 1.18
 
-require pgregory.net/rapid v0.4.5
+require pgregory.net/rapid v0.5.3

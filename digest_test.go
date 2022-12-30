@@ -47,8 +47,8 @@ type uniformGen struct {
 }
 
 func newUniformGen(t *rapid.T, min float64, max float64) generator {
-	minR := rapid.Float64Range(min, max).Draw(t, "min param").(float64)
-	maxR := rapid.Float64Range(minR, max).Draw(t, "max param").(float64)
+	minR := rapid.Float64Range(min, max).Draw(t, "min param")
+	maxR := rapid.Float64Range(minR, max).Draw(t, "max param")
 
 	return &uniformGen{
 		Rand: rand.New(rand.NewSource(0)),
@@ -64,8 +64,8 @@ type normalGen struct {
 }
 
 func newNormalGen(t *rapid.T, min float64, max float64) generator {
-	mean := rapid.Float64Range(min, max).Draw(t, "mean param").(float64)
-	stddev := rapid.Float64Range(0, (max-min)/2).Draw(t, "stddev param").(float64)
+	mean := rapid.Float64Range(min, max).Draw(t, "mean param")
+	stddev := rapid.Float64Range(0, (max-min)/2).Draw(t, "stddev param")
 
 	return &normalGen{
 		Rand:   rand.New(rand.NewSource(0)),
@@ -81,8 +81,8 @@ type logNormalGen struct {
 }
 
 func newLogNormalGen(t *rapid.T, min float64, max float64) generator {
-	mean := rapid.Float64Range(min, max).Draw(t, "mean param").(float64)
-	stddev := rapid.Float64Range(0, (max-min)/2).Draw(t, "stddev param").(float64)
+	mean := rapid.Float64Range(min, max).Draw(t, "mean param")
+	stddev := rapid.Float64Range(0, (max-min)/2).Draw(t, "stddev param")
 
 	return &logNormalGen{
 		Rand:  rand.New(rand.NewSource(0)),
@@ -98,8 +98,8 @@ type paretoGen struct {
 }
 
 func newParetoGen(t *rapid.T, min float64, max float64) generator {
-	m := rapid.Float64Range(min, max).Draw(t, "min param").(float64)
-	index := rapid.Float64Range(0.1, 10).Draw(t, "index param").(float64)
+	m := rapid.Float64Range(min, max).Draw(t, "min param")
+	index := rapid.Float64Range(0.1, 10).Draw(t, "index param")
 
 	return &paretoGen{
 		Rand:  rand.New(rand.NewSource(0)),
@@ -191,7 +191,7 @@ func (d *perfectDigest) Quantile(q float64) float64 {
 func TestDigest(t *testing.T) {
 	t.Parallel()
 
-	rapid.Check(t, rapid.Run(&digestMachine{}))
+	rapid.Check(t, rapid.Run[*digestMachine]())
 }
 
 type digestPair struct {
@@ -216,9 +216,9 @@ func (m *digestMachine) Init(t *rapid.T) {
 		minErr = 1e-2
 	}
 
-	m.min = rapid.Float64Range(minVal, 1-1e-10).Draw(t, "digest min").(float64)
-	m.max = rapid.Float64Range(1+1e-10, maxVal).Draw(t, "digest max").(float64)
-	m.err = rapid.Float64Range(minErr, 1-1e-5).Draw(t, "relative error").(float64)
+	m.min = rapid.Float64Range(minVal, 1-1e-10).Draw(t, "digest min")
+	m.max = rapid.Float64Range(1+1e-10, maxVal).Draw(t, "digest max")
+	m.err = rapid.Float64Range(minErr, 1-1e-5).Draw(t, "relative error")
 }
 
 func (m *digestMachine) Check(*rapid.T) {}
@@ -229,9 +229,9 @@ func (m *digestMachine) AddDigest(t *rapid.T) {
 		maxSize = 1000
 	}
 
-	gen := rapid.SampledFrom(generatorNames).Draw(t, "generator").(string)
-	seed := rapid.Int64().Draw(t, "seed").(int64)
-	count := rapid.IntRange(0, maxSize).Draw(t, "count").(int)
+	gen := rapid.SampledFrom(generatorNames).Draw(t, "generator")
+	seed := rapid.Int64().Draw(t, "seed")
+	count := rapid.IntRange(0, maxSize).Draw(t, "count")
 
 	d := &approxDigest{bdigest.NewDigest(m.err)}
 	r := &perfectDigest{values: make([]float64, 0, count)}
@@ -254,7 +254,7 @@ func (m *digestMachine) AddDigest(t *rapid.T) {
 		r.Add(f)
 	}
 
-	q := rapid.Float64Range(0, 1).Draw(t, "quantile").(float64)
+	q := rapid.Float64Range(0, 1).Draw(t, "quantile")
 	checkDigest(t, d, r, q, m.err)
 
 	m.digests = append(m.digests, digestPair{d, r})
@@ -265,13 +265,13 @@ func (m *digestMachine) MergeDigests(t *rapid.T) {
 		t.Skip("nothing to merge")
 	}
 
-	to := rapid.SampledFrom(m.digests).Draw(t, "digest to").(digestPair)
-	from := rapid.SampledFrom(m.digests).Draw(t, "digest from").(digestPair)
+	to := rapid.SampledFrom(m.digests).Draw(t, "digest to")
+	from := rapid.SampledFrom(m.digests).Draw(t, "digest from")
 
 	to.d.Merge(from.d)
 	to.r.Merge(from.r)
 
-	q := rapid.Float64Range(0, 1).Draw(t, "quantile").(float64)
+	q := rapid.Float64Range(0, 1).Draw(t, "quantile")
 	checkDigest(t, to.d, to.r, q, m.err)
 }
 
@@ -300,10 +300,10 @@ func TestDigestMarshalBinaryRoundtrip(t *testing.T) {
 
 func testDigestMarshalBinaryRoundtrip(t *rapid.T) {
 	var (
-		relErr = rapid.Float64Range(1e-5, 1-1e-5).Draw(t, "relative error").(float64)
-		seed   = rapid.Int64().Draw(t, "seed").(int64)
-		count  = rapid.IntRange(0, 100000).Draw(t, "count").(int)
-		ctor   = rapid.Bool().Draw(t, "use constructor").(bool)
+		relErr = rapid.Float64Range(1e-5, 1-1e-5).Draw(t, "relative error")
+		seed   = rapid.Int64().Draw(t, "seed")
+		count  = rapid.IntRange(0, 100000).Draw(t, "count")
+		ctor   = rapid.Bool().Draw(t, "use constructor")
 	)
 
 	d1 := logNormalDigest(relErr, seed, count, int32(count)/10)
@@ -333,9 +333,9 @@ func TestDigest_Reset(t *testing.T) {
 
 	rapid.Check(t, func(t *rapid.T) {
 		var (
-			err   = rapid.Float64Range(1e-5, 1-1e-5).Draw(t, "relative error").(float64)
-			seed  = rapid.Int64().Draw(t, "seed").(int64)
-			count = rapid.IntRange(0, 100000).Draw(t, "count").(int)
+			err   = rapid.Float64Range(1e-5, 1-1e-5).Draw(t, "relative error")
+			seed  = rapid.Int64().Draw(t, "seed")
+			count = rapid.IntRange(0, 100000).Draw(t, "count")
 		)
 
 		d := logNormalDigest(err, seed, count, int32(count)/10)
